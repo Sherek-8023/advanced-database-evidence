@@ -1,35 +1,41 @@
-# Poverty Bank A2 — optimized prototype
+# Poverty Bank A2 — Optimized Prototype
 
-本版本在独立 Docker project、数据库和 volume 中运行，不覆盖原版。
+This version runs in an isolated Docker project, database, and volume. It does not overwrite the original prototype.
 
-## 启动 / Run
+## Start the application
 
-在本目录执行：
+Run from this directory:
 
 ```sh
 docker compose up --build -d --wait web
 ```
 
-打开 http://localhost:18080 。首次启动会自动建表、生成数据、集成、验证并创建只读报表账号。
-PostgreSQL：localhost:15434，database `poverty_bank`，user/password `student`（仅本地教学）。
-网页使用权限受限的 `report_reader`，并非 student 超级用户。端口仅绑定 localhost。
+Open <http://localhost:18080>. On first startup, the application creates the schema, generates the demo data, runs the integration pipeline and validation, and creates a read-only reporting account.
 
-## 已实现 / Features
+- PostgreSQL: `localhost:15434`
+- Database: `poverty_bank`
+- Local teaching credentials: `student` / `student`
+- The dashboard connects with the restricted `report_reader` account, not the student account.
+- Ports are bound to localhost only.
 
-- 四个模拟业务来源：Deposits、Cards、Lending、CRM；同一 PostgreSQL 内不同 source schemas，不宣称为四个实际部署的外部系统。
-- 原始数据 → staging/身份匹配 → Data Vault 与维度仓库两条加载路径 → 三个 dashboard。CRM consent/interactions 经身份映射进入仓库。
-- 120 条来源客户档案（Deposits 39、Cards 30、Lending 14、CRM 37）整合为 50 个 canonical identities（不等于 50 个已确认的独立自然人）；92 个账户、1,968 笔存款/卡交易、62 笔还款、92 条 CRM 活动。交易覆盖 2026-07-01 至 2026-10-15 的 107 天。
-- Customer 360：搜索、身份筛选、分页、产品分布图、consent 状态、最近 20 条交易/还款/CRM 活动、来源身份明细。
-- Transaction Monitoring：日期预设、客户/标记筛选、每日交易趋势、分页、逐客户逐日钻取底层交易。
-- Product Review：建议类别图、可解释的规则证据；排除 CLOSED 持有状态；身份冲突/未匹配或无账户数据时不推荐产品。
-- 三个报告支持筛选后 CSV（包括全部匹配页）和 full report CSV；页面更新时间与最近成功验证的数据加载时间分开显示。
-- 缺 email、同 email 不同生日、CRM-only、不同产品组合、关闭账户、不同渠道/商户、CDR 撤回及历史事件等场景均保留。
+## Implemented features
 
-数据为可重复生成的合成数据。余额为设定的当前快照，交易是示例活动，不是完整流水账，不能用来重建余额历史。
-REVIEW 是课堂阈值规则，不是反洗钱模型、欺诈结论、信贷决策或真实营销许可。CDR consent 不等于 marketing consent。
-身份匹配采用规范化 email，DOB 冲突隔离；不是生产级 KYC。
+- Four simulated business sources: Deposits, Cards, Lending, and CRM. They are represented by separate source schemas in one PostgreSQL instance; they are not four independently deployed external systems.
+- An end-to-end pipeline from source data through staging and identity matching, then into parallel Data Vault and dimensional warehouse paths, followed by three dashboard reports. CRM consent and interactions are identity-mapped into the warehouse.
+- 120 source customer profiles (Deposits 39, Cards 30, Lending 14, CRM 37), integrated into 50 canonical identities. This does not mean there are 50 confirmed distinct real-world people. The dataset also contains 92 accounts, 1,968 deposit/card transactions, 62 repayments, and 92 CRM activities. Transactions span 107 days, from 2026-07-01 to 2026-10-15.
+- **Customer 360:** search, identity-status filtering, pagination, product distribution, consent status, the latest 20 transactions/repayments/CRM activities, and source-identity details.
+- **Transaction Risk:** date presets, customer and flag filters, daily transaction trends, pagination, and customer/day drill-down to underlying transactions.
+- **Product Opportunities:** recommendation-category chart and explainable rule evidence. Closed holdings are excluded; no recommendation is made when identity is unresolved or account data is unavailable.
+- All three reports support filtered CSV exports (including all matching pages) and full-report CSV exports. The page retrieval timestamp is shown separately from the most recent successful data-load timestamp.
+- The data retains cases such as missing email, different dates of birth for the same email, CRM-only identities, varied product combinations, closed accounts, different channels/merchants, CDR withdrawals, and historical consent events.
 
-## 检查 / Verify
+The dataset is reproducible synthetic data. Balances are configured current snapshots; transactions are sample activity, not a complete ledger, and cannot be used to reconstruct balance history.
+
+`REVIEW` is a classroom threshold rule, not an anti-money-laundering model, fraud finding, credit decision, or real marketing permission. CDR consent is not the same as marketing consent. Identity matching uses normalized email, with date-of-birth conflicts kept separate; this is not production-grade KYC.
+
+## Verification
+
+Run these commands while the web service is running:
 
 ```sh
 docker compose exec -T web python scripts/verify_pipeline.py
@@ -38,31 +44,37 @@ docker compose exec -T web env TMPDIR=/dev/shm python -m unittest discover -s te
 docker compose exec -T web python -m unittest discover -s tests -p 'test_consent_sql.py' -v
 ```
 
-数据验证将原始来源与身份映射、事实表、钻取明细及汇总独立核对，而不只检查 SQL 是否执行成功。
-SQL 回归测试创建随机命名的临时数据库，结束时仅删除它自己创建的测试库，不操作主库。
+Pipeline verification independently checks source records, identity mappings, warehouse facts, drill-down records, and aggregates rather than merely checking that SQL ran successfully. The SQL regression tests create a randomly named temporary database and remove only that test database when finished; they do not operate on the main database.
 
-重复加载：`docker compose run --rm python python run_sql.py`。稳定业务键阻止事实重复插入；Vault 保留加载历史。
-导出运行日志和三份 CSV：`bash scripts/run_pipeline.sh`。
-打包源码：`python scripts/package_release.py`，不包含数据库 volume、个人路径、密钥或本机设置。
+To rerun the pipeline:
 
-## 独立质量演示 / Isolated quality cases
+```sh
+docker compose run --rm python python run_sql.py
+```
+
+Stable business keys prevent duplicate fact inserts, while the Vault retains load history. To export pipeline logs and the three CSV reports, run `bash scripts/run_pipeline.sh`. To package the source code, run `python scripts/package_release.py`; the package excludes the database volume, personal paths, secrets, and local machine settings.
+
+## Isolated data-quality scenarios
+
+Start the separate quality-demo services and check their status:
 
 ```sh
 docker compose -f compose.quality.yaml up --build -d --wait web-identity web-consent web-types
 docker compose -f compose.quality.yaml run --rm quality-cli python scripts/quality_demo.py status all
 ```
 
-Identity / Consent events / Consent types：分别为 http://localhost:18085 、http://localhost:18086 、http://localhost:18087 。
-质量库端口 15435；各场景使用原始小型基线，便于观察注入前后变化，不混入扩容数据。
-在这些新端口的独立环境使用 `inject`、`run`、`verify`、`reset`（例如 `... quality_demo.py inject identity`）；先查 status。
-本目录配置不改动原版 18081–18083 的数据库或 volume。
+The Identity, Consent Events, and Consent Types dashboards are available at <http://localhost:18085>, <http://localhost:18086>, and <http://localhost:18087>, respectively. The quality database uses port `15435`. Each scenario starts from the original small baseline so changes before and after injection are easy to see; it is kept separate from the expanded showcase dataset.
 
-## 演示路线 / Demo route
+Use `inject`, `run`, `verify`, and `reset` in this isolated environment (for example, `... quality_demo.py inject identity`), and check `status` first. This configuration does not change the original prototype's database or ports `18081`–`18083`.
 
-1. Customer 360 展示总量与来源映射；选择一个多产品客户，展示活动时间线。
-2. 从客户打开交易报告，选一天，核对总数/金额与逐笔记录。
-3. 全历史与近 7/30 天切换，观察趋势图和汇总变化；导出 filtered CSV。
-4. Product Review 查看不同建议及解释，再展示身份冲突、CRM-only 与 closed-card 案例。
-5. 必要时使用独立质量环境展示故障注入、重新加载、验证与恢复。
+## Suggested demo route
 
-停止但保留数据：`docker compose stop`。不要使用 `down -v`，除非明确希望删除本版本数据。
+1. In Customer 360, show the overall counts and source mapping, then open a multi-product customer and review the activity timeline.
+2. Open the transaction report from a customer, select a date, and compare the summary with the underlying transaction rows.
+3. Switch between all history and the recent 7-/30-day views; observe the trend and totals, then export a filtered CSV.
+4. In Product Opportunities, review the different suggestions and their explanations, then show an identity-conflict, CRM-only, or closed-card example.
+5. If time allows, use the isolated quality environment to demonstrate fault injection, reload, verification, and reset.
+
+The recorded dashboard demo is available at [demo/A2-dashboard-demo.mp4](demo/A2-dashboard-demo.mp4).
+
+To stop the application while preserving its data, run `docker compose stop`. Avoid `docker compose down -v` unless you intentionally want to delete this version's database volume.
