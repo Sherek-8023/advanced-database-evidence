@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#009f47">
+  <title>Customer 360 · Poverty Bank</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to reports</a>
+  <header class="masthead">
+    <a class="brand" href="#customers" aria-label="Poverty Bank, Customer 360"><img src="/favicon.svg" alt="" width="38" height="38"><span>Poverty Bank</span></a>
+    <span class="demo-chip" title="All records in this project are synthetic demonstration data">DEMO</span>
+    <span id="scenario-label" class="scenario-label" hidden></span>
+    <nav class="navigation" aria-label="Reports">
+      <a href="#customers" data-view="customers" aria-current="page">Customer 360</a>
+      <a href="#risk" data-view="risk">Transaction Risk</a>
+      <a href="#opportunities" data-view="opportunities">Product Opportunities</a>
+    </nav>
+  </header>
+  <main id="main" tabindex="-1">
+    <div class="page-heading">
+      <div class="page-heading-copy"><h1 id="page-title">Customer 360</h1><p id="page-description">Explore customer identities and linked accounts</p></div>
+      <div class="page-actions">
+        <div class="data-meta"><span id="snapshot-time" title="Time this page last read the reporting views; not the time source data was updated.">Waiting for report data…</span><span id="data-period" hidden></span></div>
+        <div class="toolbar"><button class="button button-secondary" id="refresh-button" type="button"><svg class="icon" aria-hidden="true"><use href="/icons.svg#refresh-cw"></use></svg><span>Refresh</span></button><div class="export-action"><button class="button button-primary" id="export-button" type="button" disabled><svg class="icon" aria-hidden="true"><use href="/icons.svg#download"></use></svg><span>Export full report</span></button><span id="export-scope">CSV · all report rows</span></div></div>
+      </div>
+    </div>
+    <div id="global-message" class="message" role="status" aria-live="polite" hidden></div>
+    <div id="loading-state" class="loading-state"><strong>Loading your reports</strong><p>Reading the current PostgreSQL reporting views.</p></div>
+    <div id="report-content" hidden>
+      <section id="view-customers" class="report-view" aria-label="Customer 360">
+        <div class="workbench-group">
+          <h2 class="group-title">Find a customer</h2>
+          <div class="filter-bar customer-filters">
+            <div class="filter-field"><label for="customer-search">Search customers</label><div class="search-field"><svg class="icon" aria-hidden="true"><use href="/icons.svg#search"></use></svg><input id="customer-search" type="search" placeholder="Name, ID or email" autocomplete="off"></div></div>
+            <div class="filter-field"><label for="identity-filter">Identity status</label><select id="identity-filter"><option value="">All statuses</option></select></div>
+            <div class="clear-field"><button id="customer-clear" class="text-button" type="button">Clear filters</button></div>
+          </div>
+          <div id="customer-kpis" class="filtered-summary" aria-label="Filtered customer results"></div>
+          <div class="master-detail customer-layout">
+            <div class="list-panel customer-directory"><div class="panel-heading"><h2>Customer directory</h2><span id="customer-result-count" class="table-count"></span></div><div class="directory-columns"><span>Customer</span><span>Identity status</span></div><div id="customer-list" class="customer-list" aria-label="Matching canonical identities"></div><div class="list-note"><svg class="icon" aria-hidden="true"><use href="/icons.svg#info"></use></svg><span>Unmatched identities are kept separate.</span></div></div>
+            <div id="customer-detail" class="detail-panel" aria-label="Selected customer details"></div>
+          </div>
+        </div>
+        <details class="definitions"><summary>About this report <span>Metric definitions and data scope</span></summary><div class="definition-grid"><div><h3>Customer identities</h3><p>Each entry is one canonical customer ID. Unmatched and ambiguous identities remain separate, so this is not a verified count of people.</p></div><div><h3>Accounts and balances</h3><p>Active accounts count OPEN or ACTIVE statuses. Balance totals include all loaded accounts, regardless of status. Credit and loan balances are combined without netting against deposits.</p></div><div><h3>Consent and activity</h3><p>Consent is specifically CDR_DATA_SHARING. A missing record is Unknown, not approval. Latest activity includes transactions, loan repayments and CRM interactions. Source timestamps have no timezone.</p></div></div><p class="definition-source">Report view: <code>dw.vw_customer_360</code></p></details>
+      </section>
+      <section id="view-risk" class="report-view" aria-label="Transaction Risk" hidden>
+        <div class="workbench-group">
+          <h2 class="group-title">Review criteria</h2>
+          <div class="filter-bar risk-filters">
+            <div class="filter-field"><label for="risk-customer">Customer</label><select id="risk-customer"><option value="">All customers</option></select></div>
+            <fieldset class="date-range"><legend>Transaction period <span class="native-date-note">Native date format</span></legend><div class="date-fields"><label for="risk-from"><span>From</span><input type="date" id="risk-from" title="Displayed in your browser’s native date format. Leave empty for no lower date limit."></label><label for="risk-to"><span>To</span><input type="date" id="risk-to" title="Displayed in your browser’s native date format. Leave empty for no upper date limit."></label></div></fieldset>
+            <div class="filter-field"><label for="risk-status">Review status</label><select id="risk-status"><option value="">All statuses</option><option value="REVIEW" selected>Review</option><option value="NORMAL">Normal</option></select></div>
+            <div class="clear-field"><button id="risk-clear" class="text-button" type="button">Clear filters</button></div>
+          </div>
+          <p id="risk-filter-error" class="inline-error" role="status" hidden>From date must be on or before To date.</p>
+          <div id="risk-kpis" class="filtered-summary" aria-label="Filtered transaction results"></div>
+          <div class="master-detail risk-layout"><div class="list-panel"><div class="panel-heading"><h2>Daily activity</h2><span id="risk-count" class="table-count"></span></div><div id="risk-table" class="table-scroll" tabindex="0" aria-label="Daily activity. Scroll horizontally if needed."></div></div><div id="risk-detail" class="detail-panel" aria-label="Selected transaction day details"></div></div>
+        </div>
+        <details class="definitions"><summary>About this report <span>Thresholds and data scope</span></summary><div class="definition-grid"><div><h3>One customer, one day</h3><p>One row per canonical customer ID per transaction date. Only transaction facts are included; repayments and CRM interactions are excluded.</p></div><div><h3>Review rule</h3><p>At least 3 transactions OR a largest absolute amount of at least A$1,500 triggers REVIEW. Gross value sums absolute amounts; deposits and withdrawals both contribute positive amounts.</p></div><div><h3>Filtered results</h3><p>Summary values, chart and filtered CSV use every matching row, across all pages. Full report exports ignore filters. Select a day for the underlying transactions. A review flag is not a finding of fraud.</p></div></div><p class="definition-source">Report view: <code>dw.vw_transaction_risk_monitor</code></p></details>
+      </section>
+      <section id="view-opportunities" class="report-view" aria-label="Product Opportunities" hidden>
+        <div class="workbench-group">
+          <h2 class="group-title">Find a review opportunity</h2>
+          <div class="filter-bar opportunity-filters"><div class="filter-field"><label for="opportunity-search">Search customers</label><div class="search-field"><svg class="icon" aria-hidden="true"><use href="/icons.svg#search"></use></svg><input type="search" id="opportunity-search" placeholder="Customer name or ID" autocomplete="off"></div></div><div class="filter-field"><label for="opportunity-type">Suggestion type</label><select id="opportunity-type"><option value="">All suggestions</option></select></div><div class="clear-field"><button id="opportunity-clear" class="text-button" type="button">Clear filters</button></div></div>
+          <div id="opportunity-kpis" class="filtered-summary" aria-label="Filtered opportunity results"></div>
+          <div class="master-detail opportunity-layout"><div class="list-panel"><div class="panel-heading"><h2>Opportunity results</h2><span id="opportunity-count" class="table-count"></span></div><div id="opportunity-table" class="table-scroll" tabindex="0" aria-label="Opportunity results. Scroll horizontally if needed."></div></div><div id="opportunity-detail" class="detail-panel" aria-label="Selected opportunity details"></div></div>
+        </div>
+        <details class="definitions"><summary>About this report <span>Rules, priority and missing values</span></summary><div class="definition-grid"><div><h3>First matching rule wins</h3><p>The SQL checks loan review, card balance review, then credit card review. One suggestion is returned per identity with sufficient identity and account data.</p></div><div><h3>Active products in loaded data</h3><p>OPEN and ACTIVE accounts determine current holdings. Closed accounts do not block a review. Missing account data remains Unknown and requires review.</p></div><div><h3>Review candidates</h3><p>Rules produce human-review candidates, not credit decisions, proof of financial difficulty or marketing permission. CDR consent is not marketing approval. Export filtered follows the current filters across all pages; Export all retrieves the full report.</p></div></div><p class="definition-source">Report view: <code>dw.vw_product_opportunity</code></p></details>
+      </section>
+      <footer class="workspace-footer"><span id="database-status">Reporting views connected</span><span>Synthetic data · Read-only reports · AUD is a display convention; source records have no currency field.</span></footer>
+    </div>
+  </main>
+  <div id="selection-status" class="sr-only" role="status" aria-live="polite"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <noscript><div class="noscript">JavaScript is required to load the database reports.</div></noscript>
+</body>
+</html>

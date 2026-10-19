@@ -1,0 +1,104 @@
+name: poverty-bank-a2-optimized-quality
+
+x-quality-app: &quality-app
+  image: poverty-bank-a2-optimized-quality:local
+  build:
+    context: .
+    dockerfile: Dockerfile
+  working_dir: /workspace
+  environment: &quality-env
+    PYTHONUNBUFFERED: "1"
+    PYTHONDONTWRITEBYTECODE: "1"
+    TZ: UTC
+    QUALITY_PGHOST: quality-postgres
+
+x-quality-web: &quality-web
+  <<: *quality-app
+  command: ["python", "web/server.py"]
+  depends_on:
+    quality-postgres:
+      condition: service_healthy
+    quality-setup:
+      condition: service_completed_successfully
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: ["ALL"]
+  healthcheck:
+    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4).read()"]
+    interval: 3s
+    timeout: 5s
+    retries: 20
+    start_period: 10s
+
+x-report-env: &report-env
+  <<: *quality-env
+  PGHOST: quality-postgres
+  PGPORT: "5432"
+  PGUSER: report_reader
+  PGPASSWORD: local_demo_reader
+  WEB_HOST: 0.0.0.0
+  WEB_PORT: "8080"
+
+services:
+  quality-postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: student
+      POSTGRES_PASSWORD: student
+      TZ: UTC
+    ports:
+      - "127.0.0.1:${A2_QUALITY_PG_PORT:-15435}:5432"
+    volumes:
+      - quality-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U student -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  quality-setup:
+    <<: *quality-app
+    depends_on:
+      quality-postgres:
+        condition: service_healthy
+    command: ["python", "scripts/quality_demo.py", "init"]
+    restart: "no"
+
+  quality-cli:
+    <<: *quality-app
+    profiles: ["tools"]
+    depends_on:
+      quality-postgres:
+        condition: service_healthy
+    command: ["python", "scripts/quality_demo.py", "status", "all"]
+
+  web-identity:
+    <<: *quality-web
+    environment:
+      <<: *report-env
+      PGDATABASE: quality_identity
+      REPORT_DEMO_LABEL: Identity conflict
+    ports:
+      - "127.0.0.1:${A2_IDENTITY_WEB_PORT:-18085}:8080"
+
+  web-consent:
+    <<: *quality-web
+    environment:
+      <<: *report-env
+      PGDATABASE: quality_consent
+      REPORT_DEMO_LABEL: Consent events
+    ports:
+      - "127.0.0.1:${A2_CONSENT_WEB_PORT:-18086}:8080"
+
+  web-types:
+    <<: *quality-web
+    environment:
+      <<: *report-env
+      PGDATABASE: quality_types
+      REPORT_DEMO_LABEL: Consent types
+    ports:
+      - "127.0.0.1:${A2_TYPES_WEB_PORT:-18087}:8080"
+
+volumes:
+  quality-data:
